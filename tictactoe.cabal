@@ -1,0 +1,28 @@
+cabal-version: 3.0
+name: tictactoe
+version: 0.1.0.0
+synopsis: A TUI based TicTacToe game written in Haskell
+description: A TUI based TicTacToe game written in Haskell
+author: dtiderko
+maintainer: dennis@tiderko.de
+build-type: Simple
+
+common flags
+  ghc-options:
+    -Wall
+    -threaded
+
+executable tictactoe
+  import: flags
+  main-is: Main.hs
+  other-modules:
+    GameState
+    Render
+
+  build-depends:
+    base,
+    vty,
+    vty-crossplatform,
+
+  hs-source-dirs: app
+  default-language: Haskell2010
