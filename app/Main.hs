@@ -28,9 +28,13 @@ gameLoop vty s = do
     EvKey KDown [] -> gameLoop vty $ selDown s
     EvKey KLeft [] -> gameLoop vty $ selLeft s
     EvKey KRight [] -> gameLoop vty $ selRight s
-    EvKey KEnter [] -> gameLoop vty $ nextTurn s
-    EvKey (KChar ' ') [] -> gameLoop vty $ nextTurn s
-    _ -> do
-      update vty . picForImage . string defAttr $ show e
-      threadDelay 100000
-      gameLoop vty s
+    EvKey KEnter [] -> onSelect
+    EvKey (KChar ' ') [] -> onSelect
+    _ -> gameLoop vty s -- ignore event
+ where
+  onSelect = case selected s of
+    Board _ -> gameLoop vty $ selConfirm s
+    EndedOptions p ->
+      if p == 0
+        then gameLoop vty initGameState
+        else shutdown vty

@@ -12,6 +12,7 @@ render dr s =
       [ title
       , pad 0 1 0 1 $ renderGrid (fields s) (selected s)
       , footer (turnState s)
+      , endedOptions (turnState s) (selected s)
       ]
 
     contentWidth = maximum . map imageWidth $ content
@@ -34,7 +35,7 @@ title = vertCat . map (string defAttr) $ title_text
     , " █  █ ▀▄▄  █  █▀█ ▀▄▄  █  ▀▄▀ █▄▄"
     ]
 
-renderGrid :: [[Maybe Symbol]] -> Maybe (Vertical, Horizontal) -> Image
+renderGrid :: [[Maybe Symbol]] -> Selected -> Image
 renderGrid [] _ = emptyImage
 renderGrid g sel =
   let
@@ -53,13 +54,13 @@ renderGrid g sel =
    in
     vertCat gameRowsWithSep
 
-renderRows :: [[Maybe Symbol]] -> Maybe (Vertical, Horizontal) -> [[Image]]
+renderRows :: [[Maybe Symbol]] -> Selected -> [[Image]]
 renderRows [] _ = []
-renderRows (r : rs) Nothing = renderRow r Nothing : renderRows rs Nothing
-renderRows (r : rs) (Just (v, h)) =
+renderRows (r : rs) (EndedOptions _) = renderRow r Nothing : renderRows rs (EndedOptions 0)
+renderRows (r : rs) (Board (v, h)) =
   let
     current = renderRow r (if v == 0 then Just h else Nothing)
-    rest = renderRows rs (Just (v - 1, h))
+    rest = renderRows rs (Board (v - 1, h))
    in
     current : rest
 
@@ -86,3 +87,20 @@ footer :: TurnState -> Image
 footer (Running p) = string defAttr $ "It is your turn " ++ show p ++ "!"
 footer (Ended (Just p)) = string defAttr $ show p ++ " won!"
 footer (Ended Nothing) = string defAttr "Draw!"
+
+endedOptions :: TurnState -> Selected -> Image
+endedOptions (Running _) _ = emptyImage
+endedOptions (Ended _) (Board _) = undefined
+endedOptions (Ended _) (EndedOptions p) =
+  let
+    highIfSel ipos =
+      if ipos == p
+        then defAttr `withForeColor` black `withBackColor` white
+        else defAttr
+   in
+    pad 0 1 0 0 . horizCat $
+      [ string (highIfSel 0) "<Restart>"
+      , charFill defAttr ' ' (8 :: Int) 1
+      , string (highIfSel 1) "<Quit>"
+      , charFill defAttr ' ' (1 :: Int) 1
+      ]
