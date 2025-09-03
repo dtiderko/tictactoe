@@ -88,28 +88,23 @@ selConfirm s =
     compNewFields = newFields (fields s) (selected s)
     fieldsLeft = any (elem Nothing) compNewFields
 
+    boardSize = length . head $ compNewFields
     isWinner p =
       let
         condHorz = any (all (== Just p)) compNewFields
         condVert =
           or
             [ all ((== Just p) . (!! i)) compNewFields
-            | i <- [0 .. length (head compNewFields) - 1]
+            | i <- [0 .. boardSize - 1]
             ]
         condArcoRight =
           all
             (== Just p)
-            [ head . head $ compNewFields
-            , compNewFields !! 1 !! 1
-            , compNewFields !! 2 !! 2
-            ]
+            [compNewFields !! x !! x | x <- [0 .. boardSize - 1]]
         condArcoLeft =
           all
             (== Just p)
-            [ head compNewFields !! 2
-            , compNewFields !! 1 !! 1
-            , head (compNewFields !! 2)
-            ]
+            [compNewFields !! x !! ((boardSize - 1) - x) | x <- [0 .. boardSize - 1]]
        in
         condHorz || condVert || condArcoRight || condArcoLeft
 
