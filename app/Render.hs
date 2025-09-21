@@ -1,60 +1,55 @@
 module Render where
 
 import Data.List (intersperse)
-import Graphics.Vty
 
+import Brick
+import Brick.Widgets.Center
 import GameState
 
-render :: DisplayRegion -> GameState -> Picture
-render dr s =
-  let
-    content =
-      [ title
-      , pad 0 1 0 1 $ renderGrid (fields s) (selected s)
-      , footer (turnState s)
-      , endedOptions (turnState s) (selected s)
-      ]
+myDraw :: GameState -> [Widget ()]
+myDraw s =
+  [ center $
+      foldl
+        (<=>)
+        emptyWidget
+        ( map
+            hCenter
+            [ title
+            , padTopBottom 1 $ renderGrid (_fields s) (_selected s)
+            , footer (_turnState s)
+            , endedOptions (_turnState s) (_selected s)
+            ]
+        )
+  ]
 
-    contentWidth = maximum . map imageWidth $ content
-    toPad l = (contentWidth - imageWidth l) `div` 2
-    paddedContent = map (\l -> pad (toPad l) 0 0 0 l) content
-    image = vertCat paddedContent
-
-    leftPad = (regionWidth dr - imageWidth image) `div` 2
-    topPad = (regionHeight dr - imageHeight image) `div` 2
-   in
-    if leftPad < 0 || topPad < 0
-      then picForImage $ string defAttr "Window too small!"
-      else picForImage $ pad leftPad topPad 0 0 image
-
-title :: Image
-title = vertCat . map (string defAttr) $ title_text
+title :: Widget ()
+title = vBox . map str $ title_text
  where
   title_text =
     [ "▀█▀ █ ▄▀▀ ▀█▀ ▄▀▄ ▄▀▀ ▀█▀ ▄▀▄ ██▀"
     , " █  █ ▀▄▄  █  █▀█ ▀▄▄  █  ▀▄▀ █▄▄"
     ]
 
-renderGrid :: [[Maybe Symbol]] -> Selected -> Image
-renderGrid [] _ = emptyImage
+renderGrid :: [[Maybe Symbol]] -> Selected -> Widget ()
+renderGrid [] _ = emptyWidget
 renderGrid g sel =
   let
     rows = renderRows g sel
-    sep = string defAttr "┃"
+    sep = str "┃"
     rowsWithSep = map (\r -> sep : intersperse sep r ++ [sep]) rows
-    gameRows = map horizCat rowsWithSep
+    gameRows = map hBox rowsWithSep
 
     width = length . head $ g
-    lineWith l c r = string defAttr (l ++ drop 1 (concat (replicate width c) ++ r))
+    lineWith l c r = str (l ++ drop 1 (concat (replicate width c) ++ r))
     top = lineWith "┏" "┳━━━" "┓"
     mid = lineWith "┣" "╋━━━" "┫"
     bottom = lineWith "┗" "┻━━━" "┛"
 
     gameRowsWithSep = top : intersperse mid gameRows ++ [bottom]
    in
-    vertCat gameRowsWithSep
+    vBox gameRowsWithSep
 
-renderRows :: [[Maybe Symbol]] -> Selected -> [[Image]]
+renderRows :: [[Maybe Symbol]] -> Selected -> [[Widget ()]]
 renderRows [] _ = []
 renderRows (r : rs) (EndedOptions _) = renderRow r Nothing : renderRows rs (EndedOptions 0)
 renderRows (r : rs) (Board (v, h)) =
@@ -64,43 +59,42 @@ renderRows (r : rs) (Board (v, h)) =
    in
     current : rest
 
-renderRow :: [Maybe Symbol] -> Maybe Horizontal -> [Image]
+renderRow :: [Maybe Symbol] -> Maybe Horizontal -> [Widget ()]
 renderRow [] _ = []
 renderRow (f : fs) Nothing = renderField f False : renderRow fs Nothing
 renderRow (f : fs) (Just h) = renderField f (h == 0) : renderRow fs (Just (h - 1))
 
-renderField :: Maybe Symbol -> Bool -> Image
+renderField :: Maybe Symbol -> Bool -> Widget ()
 renderField f sel =
   let
     attr =
       if sel
-        then defAttr `withForeColor` black `withBackColor` white
-        else defAttr
-    txt = case f of
+        then withAttr (attrName "highlight")
+        else id
+    inner = case f of
       Nothing -> "   "
       (Just Circle) -> " O "
       (Just Cross) -> " X "
    in
-    string attr txt
+    attr $ str inner
 
-footer :: TurnState -> Image
-footer (Running p) = string defAttr $ "It is your turn " ++ show p ++ "!"
-footer (Ended (Just p)) = string defAttr $ show p ++ " won!"
-footer (Ended Nothing) = string defAttr "Draw!"
+footer :: TurnState -> Widget ()
+footer (Running p) = str $ "It is your turn " ++ show p ++ "!"
+footer (Ended (Just p)) = str $ show p ++ " won!"
+footer (Ended Nothing) = str "Draw!"
 
-endedOptions :: TurnState -> Selected -> Image
-endedOptions (Running _) _ = emptyImage
+endedOptions :: TurnState -> Selected -> Widget ()
+endedOptions (Running _) _ = emptyWidget
 endedOptions (Ended _) (Board _) = undefined
 endedOptions (Ended _) (EndedOptions p) =
   let
     highIfSel ipos =
       if ipos == p
-        then defAttr `withForeColor` black `withBackColor` white
-        else defAttr
+        then withAttr (attrName "highlight")
+        else id
    in
-    pad 0 1 0 0 . horizCat $
-      [ string (highIfSel 0) "<Restart>"
-      , charFill defAttr ' ' (8 :: Int) 1
-      , string (highIfSel 1) "<Quit>"
-      , charFill defAttr ' ' (1 :: Int) 1
-      ]
+    padTop (Pad 1) $
+      hBox
+        [ padRight (Pad 8) $ highIfSel 0 $ str "<Restart>"
+        , highIfSel 1 $ str "<Quit>"
+        ]

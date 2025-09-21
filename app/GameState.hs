@@ -1,18 +1,26 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 module GameState (
   Vertical,
   Horizontal,
   Symbol (Circle, Cross),
   Selected (Board, EndedOptions),
   TurnState (Ended, Running),
-  GameState (turnState, selected, fields),
+  GameState (_turnState, _selected, _fields),
   initGameState,
   selUp,
   selDown,
   selLeft,
   selRight,
   selConfirm,
+  -- lenses
+  selected,
+  fields,
+  turnState,
 )
 where
+
+import Lens.Micro.TH
 
 type Vertical = Int
 type Horizontal = Int
@@ -23,26 +31,27 @@ data Symbol = Circle | Cross
 data Selected = Board (Vertical, Horizontal) | EndedOptions Horizontal
 data TurnState = Ended (Maybe Symbol) | Running Symbol
 data GameState = GameState
-  { fields :: [[Maybe Symbol]]
-  , selected :: Selected
-  , turnState :: TurnState
+  { _fields :: [[Maybe Symbol]]
+  , _selected :: Selected
+  , _turnState :: TurnState
   }
+makeLenses ''GameState
 
 initGameState :: GameState
 initGameState =
   GameState
-    { fields = replicate 3 . replicate 3 $ Nothing
-    , selected = Board (0, 0)
-    , turnState = Running Circle
+    { _fields = replicate 3 . replicate 3 $ Nothing
+    , _selected = Board (0, 0)
+    , _turnState = Running Circle
     }
 
 selMove :: Vertical -> Horizontal -> GameState -> GameState
 selMove v h s =
   let
-    height = length . fields $ s
-    width = length . head . fields $ s
+    height = length . _fields $ s
+    width = length . head . _fields $ s
 
-    newSel = case selected s of
+    newSel = case _selected s of
       Board (vo, ho) ->
         Board
           ( (vo + v) `mod` height
@@ -50,7 +59,7 @@ selMove v h s =
           )
       EndedOptions ho -> EndedOptions ((ho + h) `mod` 2)
    in
-    s{selected = newSel}
+    s{_selected = newSel}
 
 selUp :: GameState -> GameState
 selUp = selMove (-1) 0
@@ -81,11 +90,11 @@ selConfirm s =
         else f : newRow fs (hsel - 1)
 
     claimField (Just f) = Just f
-    claimField Nothing = case turnState s of
+    claimField Nothing = case _turnState s of
       Running f -> Just f
       Ended _ -> undefined
 
-    compNewFields = newFields (fields s) (selected s)
+    compNewFields = newFields (_fields s) (_selected s)
     fieldsLeft = any (elem Nothing) compNewFields
 
     boardSize = length . head $ compNewFields
@@ -113,22 +122,22 @@ selConfirm s =
       | isWinner Circle = Ended (Just Circle)
       | isWinner Cross = Ended (Just Cross)
       | fieldsLeft =
-          if compNewFields == fields s
+          if compNewFields == _fields s
             then Running p
             else case p of
               Circle -> Running Cross
               Cross -> Running Circle
       | otherwise = Ended Nothing
 
-    compNewTurnState = newTurnState (turnState s)
-    horzPos = case selected s of
+    compNewTurnState = newTurnState (_turnState s)
+    horzPos = case _selected s of
       Board (_, p) -> p `mod` 2
       EndedOptions p -> p
    in
     s
-      { fields = compNewFields
-      , turnState = compNewTurnState
-      , selected = case compNewTurnState of
-          Running _ -> selected s
+      { _fields = compNewFields
+      , _turnState = compNewTurnState
+      , _selected = case compNewTurnState of
+          Running _ -> _selected s
           Ended _ -> EndedOptions horzPos
       }

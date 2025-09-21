@@ -1,40 +1,48 @@
 module Main where
 
-import Graphics.Vty
-import Graphics.Vty.CrossPlatform (mkVty)
+import Brick
 
-import Control.Concurrent
+import Graphics.Vty
+import Lens.Micro.Mtl
+
 import Render
 
 import GameState
 
-main :: IO ()
+main :: IO GameState
 main = do
-  vty <- mkVty defaultConfig
-  setWindowTitle vty "TicTacToe"
+  let app =
+        App
+          { appChooseCursor = const . const Nothing
+          , appStartEvent = return ()
+          , appAttrMap = myAttrMap
+          , appHandleEvent = myHandleEvent
+          , appDraw = myDraw
+          }
 
-  gameLoop vty initGameState
+  defaultMain app initGameState
 
-gameLoop :: Vty -> GameState -> IO ()
-gameLoop vty s = do
-  dr <- displayBounds . outputIface $ vty
-  update vty $ render dr s
+myAttrMap :: GameState -> AttrMap
+myAttrMap = const $ attrMap defAttr [(attrName "highlight", black `on` white)]
 
-  e <- nextEvent vty
-  case e of
-    EvKey (KChar 'q') [] -> shutdown vty
-    EvKey (KChar 'c') [MCtrl] -> shutdown vty
-    EvKey KUp [] -> gameLoop vty $ selUp s
-    EvKey KDown [] -> gameLoop vty $ selDown s
-    EvKey KLeft [] -> gameLoop vty $ selLeft s
-    EvKey KRight [] -> gameLoop vty $ selRight s
-    EvKey KEnter [] -> onSelect
-    EvKey (KChar ' ') [] -> onSelect
-    _ -> gameLoop vty s -- ignore event
+myHandleEvent :: BrickEvent () e -> EventM () GameState ()
+myHandleEvent (VtyEvent e) = case e of
+  EvKey (KChar 'q') [] -> halt
+  EvKey (KChar 'c') [MCtrl] -> halt
+  EvKey KUp [] -> modify selUp
+  EvKey KDown [] -> modify selDown
+  EvKey KLeft [] -> modify selLeft
+  EvKey KRight [] -> modify selRight
+  EvKey KEnter [] -> onSelect
+  EvKey (KChar ' ') [] -> onSelect
+  _ -> return ()
  where
-  onSelect = case selected s of
-    Board _ -> gameLoop vty $ selConfirm s
-    EndedOptions p ->
-      if p == 0
-        then gameLoop vty initGameState
-        else shutdown vty
+  onSelect = do
+    sel <- use selected
+    case sel of
+      Board _ -> modify selConfirm
+      EndedOptions p ->
+        if p == 0
+          then modify $ const initGameState
+          else halt
+myHandleEvent _ = undefined
