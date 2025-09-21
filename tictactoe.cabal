@@ -1,6 +1,6 @@
 cabal-version: 3.0
 name: tictactoe
-version: 0.1.1
+version: 0.2.0
 synopsis: A TUI based TicTacToe game written in Haskell
 description: A TUI based TicTacToe game written in Haskell
 author: dtiderko
