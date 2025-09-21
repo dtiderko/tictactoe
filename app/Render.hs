@@ -4,9 +4,11 @@ import Data.List (intersperse)
 
 import Brick
 import Brick.Widgets.Center
+
+import Events
 import GameState
 
-myDraw :: GameState -> [Widget ()]
+myDraw :: GameState -> [Widget Clickable]
 myDraw s =
   [ center $
       foldl
@@ -22,7 +24,7 @@ myDraw s =
         )
   ]
 
-title :: Widget ()
+title :: Widget Clickable
 title = vBox . map str $ title_text
  where
   title_text =
@@ -30,11 +32,11 @@ title = vBox . map str $ title_text
     , " █  █ ▀▄▄  █  █▀█ ▀▄▄  █  ▀▄▀ █▄▄"
     ]
 
-renderGrid :: [[Maybe Symbol]] -> Selected -> Widget ()
+renderGrid :: [[Maybe Symbol]] -> Selected -> Widget Clickable
 renderGrid [] _ = emptyWidget
 renderGrid g sel =
   let
-    rows = renderRows g sel
+    rows = renderRows g sel 0
     sep = str "┃"
     rowsWithSep = map (\r -> sep : intersperse sep r ++ [sep]) rows
     gameRows = map hBox rowsWithSep
@@ -49,23 +51,23 @@ renderGrid g sel =
    in
     vBox gameRowsWithSep
 
-renderRows :: [[Maybe Symbol]] -> Selected -> [[Widget ()]]
-renderRows [] _ = []
-renderRows (r : rs) (EndedOptions _) = renderRow r Nothing : renderRows rs (EndedOptions 0)
-renderRows (r : rs) (Board (v, h)) =
+renderRows :: [[Maybe Symbol]] -> Selected -> Vertical -> [[Widget Clickable]]
+renderRows [] _ _ = []
+renderRows (r : rs) (EndedOptions _) vert = renderRow r Nothing vert 0 : renderRows rs (EndedOptions 0) (vert + 1)
+renderRows (r : rs) (Board (v, h)) vert =
   let
-    current = renderRow r (if v == 0 then Just h else Nothing)
-    rest = renderRows rs (Board (v - 1, h))
+    current = renderRow r (if v == 0 then Just h else Nothing) vert 0
+    rest = renderRows rs (Board (v - 1, h)) (vert + 1)
    in
     current : rest
 
-renderRow :: [Maybe Symbol] -> Maybe Horizontal -> [Widget ()]
-renderRow [] _ = []
-renderRow (f : fs) Nothing = renderField f False : renderRow fs Nothing
-renderRow (f : fs) (Just h) = renderField f (h == 0) : renderRow fs (Just (h - 1))
+renderRow :: [Maybe Symbol] -> Maybe Horizontal -> Vertical -> Horizontal -> [Widget Clickable]
+renderRow [] _ _ _ = []
+renderRow (f : fs) Nothing vert horz = renderField f False vert horz : renderRow fs Nothing vert (horz + 1)
+renderRow (f : fs) (Just h) vert horz = renderField f (h == 0) vert horz : renderRow fs (Just (h - 1)) vert (horz + 1)
 
-renderField :: Maybe Symbol -> Bool -> Widget ()
-renderField f sel =
+renderField :: Maybe Symbol -> Bool -> Vertical -> Horizontal -> Widget Clickable
+renderField f sel vert horz =
   let
     attr =
       if sel
@@ -76,14 +78,14 @@ renderField f sel =
       (Just Circle) -> " O "
       (Just Cross) -> " X "
    in
-    attr $ str inner
+    attr $ clickable (Cell (vert, horz)) $ str inner
 
-footer :: TurnState -> Widget ()
+footer :: TurnState -> Widget Clickable
 footer (Running p) = str $ "It is your turn " ++ show p ++ "!"
 footer (Ended (Just p)) = str $ show p ++ " won!"
 footer (Ended Nothing) = str "Draw!"
 
-endedOptions :: TurnState -> Selected -> Widget ()
+endedOptions :: TurnState -> Selected -> Widget Clickable
 endedOptions (Running _) _ = emptyWidget
 endedOptions (Ended _) (Board _) = undefined
 endedOptions (Ended _) (EndedOptions p) =
@@ -92,9 +94,16 @@ endedOptions (Ended _) (EndedOptions p) =
       if ipos == p
         then withAttr (attrName "highlight")
         else id
+
+    restart =
+      padRight (Pad 8) $
+        highIfSel 0 $
+          clickable Restart $
+            str "<Restart>"
+    quit = highIfSel 1 $ clickable Quit $ str "<Quit>"
    in
     padTop (Pad 1) $
       hBox
-        [ padRight (Pad 8) $ highIfSel 0 $ str "<Restart>"
-        , highIfSel 1 $ str "<Quit>"
+        [ restart
+        , quit
         ]

@@ -2,19 +2,19 @@ module Main where
 
 import Brick
 
-import Graphics.Vty
-import Lens.Micro.Mtl
-
-import Render
-
+import Control.Monad (when)
+import Control.Monad.IO.Class (MonadIO (liftIO))
+import Events
 import GameState
+import Graphics.Vty
+import Render
 
 main :: IO GameState
 main = do
   let app =
         App
           { appChooseCursor = const . const Nothing
-          , appStartEvent = return ()
+          , appStartEvent = enableMouseSupport
           , appAttrMap = myAttrMap
           , appHandleEvent = myHandleEvent
           , appDraw = myDraw
@@ -22,27 +22,13 @@ main = do
 
   defaultMain app initGameState
 
+enableMouseSupport :: EventM Clickable GameState ()
+enableMouseSupport = do
+  vty <- getVtyHandle
+  let output = outputIface vty
+  when (supportsMode output Mouse) $
+    liftIO $
+      setMode output Mouse True
+
 myAttrMap :: GameState -> AttrMap
 myAttrMap = const $ attrMap defAttr [(attrName "highlight", black `on` white)]
-
-myHandleEvent :: BrickEvent () e -> EventM () GameState ()
-myHandleEvent (VtyEvent e) = case e of
-  EvKey (KChar 'q') [] -> halt
-  EvKey (KChar 'c') [MCtrl] -> halt
-  EvKey KUp [] -> modify selUp
-  EvKey KDown [] -> modify selDown
-  EvKey KLeft [] -> modify selLeft
-  EvKey KRight [] -> modify selRight
-  EvKey KEnter [] -> onSelect
-  EvKey (KChar ' ') [] -> onSelect
-  _ -> return ()
- where
-  onSelect = do
-    sel <- use selected
-    case sel of
-      Board _ -> modify selConfirm
-      EndedOptions p ->
-        if p == 0
-          then modify $ const initGameState
-          else halt
-myHandleEvent _ = undefined

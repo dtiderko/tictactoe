@@ -1,8 +1,9 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 module GameState (
-  Vertical,
   Horizontal,
+  Vertical,
+  Pos,
   Symbol (Circle, Cross),
   Selected (Board, EndedOptions),
   TurnState (Ended, Running),
@@ -13,6 +14,7 @@ module GameState (
   selLeft,
   selRight,
   selConfirm,
+  selAndConfirm,
   -- lenses
   selected,
   fields,
@@ -24,11 +26,12 @@ import Lens.Micro.TH
 
 type Vertical = Int
 type Horizontal = Int
+type Pos = (Vertical, Horizontal)
 
 data Symbol = Circle | Cross
   deriving (Eq, Show)
 
-data Selected = Board (Vertical, Horizontal) | EndedOptions Horizontal
+data Selected = Board Pos | EndedOptions Horizontal
 data TurnState = Ended (Maybe Symbol) | Running Symbol
 data GameState = GameState
   { _fields :: [[Maybe Symbol]]
@@ -45,8 +48,8 @@ initGameState =
     , _turnState = Running Circle
     }
 
-selMove :: Vertical -> Horizontal -> GameState -> GameState
-selMove v h s =
+selMove :: Pos -> GameState -> GameState
+selMove (v, h) s =
   let
     height = length . _fields $ s
     width = length . head . _fields $ s
@@ -62,16 +65,16 @@ selMove v h s =
     s{_selected = newSel}
 
 selUp :: GameState -> GameState
-selUp = selMove (-1) 0
+selUp = selMove (-1, 0)
 
 selDown :: GameState -> GameState
-selDown = selMove 1 0
+selDown = selMove (1, 0)
 
 selLeft :: GameState -> GameState
-selLeft = selMove 0 (-1)
+selLeft = selMove (0, -1)
 
 selRight :: GameState -> GameState
-selRight = selMove 0 1
+selRight = selMove (0, 1)
 
 selConfirm :: GameState -> GameState
 selConfirm s =
@@ -141,3 +144,12 @@ selConfirm s =
           Running _ -> _selected s
           Ended _ -> EndedOptions horzPos
       }
+
+selAndConfirm :: Pos -> GameState -> GameState
+selAndConfirm p s =
+  let
+    newSel = case _selected s of
+      Board _ -> Board p
+      EndedOptions h -> EndedOptions h
+   in
+    selConfirm s{_selected = newSel}

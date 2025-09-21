@@ -16,6 +16,7 @@ executable tictactoe
   import: flags
   main-is: Main.hs
   other-modules:
+    Events
     GameState
     Render
 
