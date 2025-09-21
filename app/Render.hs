@@ -10,18 +10,14 @@ import GameState
 
 myDraw :: GameState -> [Widget Clickable]
 myDraw s =
-  [ center $
-      foldl
-        (<=>)
-        emptyWidget
-        ( map
-            hCenter
-            [ title
-            , padTopBottom 1 $ renderGrid (_fields s) (_selected s)
-            , footer (_turnState s)
-            , endedOptions (_turnState s) (_selected s)
-            ]
-        )
+  [ center . vBox $
+      map
+        hCenter
+        [ title
+        , padTopBottom 1 $ renderGrid (_fields s) (_selected s)
+        , footer (_turnState s)
+        , endedOptions (_turnState s) (_selected s)
+        ]
   ]
 
 title :: Widget Clickable
@@ -52,19 +48,14 @@ renderGrid g sel =
     vBox gameRowsWithSep
 
 renderRows :: [[Maybe Symbol]] -> Selected -> Vertical -> [[Widget Clickable]]
-renderRows [] _ _ = []
-renderRows (r : rs) (EndedOptions _) vert = renderRow r Nothing vert 0 : renderRows rs (EndedOptions 0) (vert + 1)
-renderRows (r : rs) (Board (v, h)) vert =
-  let
-    current = renderRow r (if v == 0 then Just h else Nothing) vert 0
-    rest = renderRows rs (Board (v - 1, h)) (vert + 1)
-   in
-    current : rest
+renderRows rs sel _ = zipWith (\i -> renderRow (selAtRow i) i) [0 ..] rs
+ where
+  selAtRow i = case sel of
+    Board (v, h) | i == v -> Just h
+    _ -> Nothing
 
-renderRow :: [Maybe Symbol] -> Maybe Horizontal -> Vertical -> Horizontal -> [Widget Clickable]
-renderRow [] _ _ _ = []
-renderRow (f : fs) Nothing vert horz = renderField f False vert horz : renderRow fs Nothing vert (horz + 1)
-renderRow (f : fs) (Just h) vert horz = renderField f (h == 0) vert horz : renderRow fs (Just (h - 1)) vert (horz + 1)
+renderRow :: Maybe Horizontal -> Vertical -> [Maybe Symbol] -> [Widget Clickable]
+renderRow sel v = zipWith (\i f -> renderField f (Just i == sel) v i) [0 ..]
 
 renderField :: Maybe Symbol -> Bool -> Vertical -> Horizontal -> Widget Clickable
 renderField f sel vert horz =

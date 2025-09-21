@@ -35,4 +35,4 @@ myHandleEvent (VtyEvent e) = case e of
         if p == 0
           then modify $ const initGameState
           else halt
-myHandleEvent _ = undefined
+myHandleEvent _ = return ()

@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module GameState (
@@ -22,15 +23,15 @@ module GameState (
 )
 where
 
+import Data.List (transpose)
+import Lens.Micro
 import Lens.Micro.TH
 
 type Vertical = Int
 type Horizontal = Int
 type Pos = (Vertical, Horizontal)
 
-data Symbol = Circle | Cross
-  deriving (Eq, Show)
-
+data Symbol = Circle | Cross deriving (Eq, Show)
 data Selected = Board Pos | EndedOptions Horizontal
 data TurnState = Ended (Maybe Symbol) | Running Symbol
 data GameState = GameState
@@ -64,85 +65,65 @@ selMove (v, h) s =
    in
     s{_selected = newSel}
 
-selUp :: GameState -> GameState
+selUp, selDown, selLeft, selRight :: GameState -> GameState
 selUp = selMove (-1, 0)
-
-selDown :: GameState -> GameState
 selDown = selMove (1, 0)
-
-selLeft :: GameState -> GameState
 selLeft = selMove (0, -1)
-
-selRight :: GameState -> GameState
 selRight = selMove (0, 1)
 
-selConfirm :: GameState -> GameState
-selConfirm s =
+isWinner :: Symbol -> [[Maybe Symbol]] -> Bool
+isWinner p board =
   let
-    newFields [] _ = []
-    newFields rs (EndedOptions _) = rs
-    newFields (r : rs) (Board (v, h)) =
-      if v == 0
-        then newRow r h : newFields rs (Board (v - 1, h))
-        else r : newFields rs (Board (v - 1, h))
+    boardSize = length (head board)
+    condDiag f = all (== Just p) [board !! i !! f i | i <- [0 .. boardSize - 1]]
+    condLine = any (all (== Just p))
+   in
+    condLine board
+      || condLine (transpose board)
+      || condDiag id
+      || condDiag (boardSize - 1 -)
 
-    newRow [] _ = []
-    newRow (f : fs) hsel =
-      if hsel == 0
-        then claimField f : newRow fs (hsel - 1)
-        else f : newRow fs (hsel - 1)
+claimOnBoard :: Pos -> Symbol -> [[Maybe Symbol]] -> [[Maybe Symbol]]
+claimOnBoard (v, h) curTurn =
+  over
+    (ix v . ix h)
+    ( \case
+        Nothing -> Just curTurn
+        Just x -> Just x
+    )
 
-    claimField (Just f) = Just f
-    claimField Nothing = case _turnState s of
-      Running f -> Just f
-      Ended _ -> undefined
+selConfirm :: GameState -> GameState
+selConfirm s@GameState{_selected = sel, _fields = fs, _turnState = ts} =
+  let
+    fs' = case (sel, ts) of
+      (Board bsel, Running curTurn) -> claimOnBoard bsel curTurn fs
+      (Board _, Ended _) -> undefined
+      (EndedOptions _, Running _) -> undefined
+      (_, _) -> fs
 
-    compNewFields = newFields (_fields s) (_selected s)
-    fieldsLeft = any (elem Nothing) compNewFields
+    ts' = case ts of
+      Ended p -> Ended p
+      Running p
+        | isWinner Circle fs' -> Ended (Just Circle)
+        | isWinner Cross fs' -> Ended (Just Cross)
+        | fieldsLeft && fs' == fs -> Running p
+        | fieldsLeft -> Running (if p == Circle then Cross else Circle)
+        | otherwise -> Ended Nothing
+     where
+      fieldsLeft = any (elem Nothing) fs'
 
-    boardSize = length . head $ compNewFields
-    isWinner p =
-      let
-        condHorz = any (all (== Just p)) compNewFields
-        condVert =
-          or
-            [ all ((== Just p) . (!! i)) compNewFields
-            | i <- [0 .. boardSize - 1]
-            ]
-        condArcoRight =
-          all
-            (== Just p)
-            [compNewFields !! x !! x | x <- [0 .. boardSize - 1]]
-        condArcoLeft =
-          all
-            (== Just p)
-            [compNewFields !! x !! ((boardSize - 1) - x) | x <- [0 .. boardSize - 1]]
-       in
-        condHorz || condVert || condArcoRight || condArcoLeft
-
-    newTurnState (Ended p) = Ended p
-    newTurnState (Running p)
-      | isWinner Circle = Ended (Just Circle)
-      | isWinner Cross = Ended (Just Cross)
-      | fieldsLeft =
-          if compNewFields == _fields s
-            then Running p
-            else case p of
-              Circle -> Running Cross
-              Cross -> Running Circle
-      | otherwise = Ended Nothing
-
-    compNewTurnState = newTurnState (_turnState s)
-    horzPos = case _selected s of
-      Board (_, p) -> p `mod` 2
-      EndedOptions p -> p
+    sel' = case ts' of
+      Running _ -> sel
+      Ended _ -> EndedOptions horzPos
+     where
+      horzPos = case sel of
+        Board (_, p) -> p `mod` 2
+        EndedOptions p -> p
    in
     s
-      { _fields = compNewFields
-      , _turnState = compNewTurnState
-      , _selected = case compNewTurnState of
-          Running _ -> _selected s
-          Ended _ -> EndedOptions horzPos
+      { _fields = fs'
+      , _turnState = ts'
+      , _selected = sel'
       }
 
 selAndConfirm :: Pos -> GameState -> GameState

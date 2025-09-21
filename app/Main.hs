@@ -25,14 +25,12 @@ main = do
   _ <- defaultMain app initGameState
   disableMouse
 
-enableMouse :: IO ()
+enableMouse, disableMouse :: IO ()
 enableMouse = do
   putStr "\ESC[?1000h" -- basic mouse enable
   putStr "\ESC[?1002h" -- button+motion enable
   putStr "\ESC[?1006h" -- SGR mode enable
   hFlush stdout
-
-disableMouse :: IO ()
 disableMouse = do
   putStr "\ESC[?1000l" -- basic mouse disable
   putStr "\ESC[?1002l" -- button+motion disable
