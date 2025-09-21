@@ -8,8 +8,9 @@ import Events
 import GameState
 import Graphics.Vty
 import Render
+import System.IO
 
-main :: IO GameState
+main :: IO ()
 main = do
   let app =
         App
@@ -20,7 +21,23 @@ main = do
           , appDraw = myDraw
           }
 
-  defaultMain app initGameState
+  _ <- enableMouse
+  _ <- defaultMain app initGameState
+  disableMouse
+
+enableMouse :: IO ()
+enableMouse = do
+  putStr "\ESC[?1000h" -- basic mouse enable
+  putStr "\ESC[?1002h" -- button+motion enable
+  putStr "\ESC[?1006h" -- SGR mode enable
+  hFlush stdout
+
+disableMouse :: IO ()
+disableMouse = do
+  putStr "\ESC[?1000l" -- basic mouse disable
+  putStr "\ESC[?1002l" -- button+motion disable
+  putStr "\ESC[?1006l" -- SGR mode disable
+  hFlush stdout
 
 enableMouseSupport :: EventM Clickable GameState ()
 enableMouseSupport = do
