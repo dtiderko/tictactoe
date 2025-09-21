@@ -14,7 +14,7 @@ Start the game with this command inside the root of this project:
 cabal run
 ```
 
-Then you can play the game using the following keys:
+Then you can play the game using your mouse. Or if you're extra fancy, you can use the following keys:
 - arrow keys to move the selection
 - enter / space to claim a field
 - q / CTRL+C to exit
